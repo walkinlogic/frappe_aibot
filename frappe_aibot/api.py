@@ -1,4 +1,5 @@
 import frappe
+import re
 
 from langchain.llms import OpenAI
 from langchain.memory import RedisChatMessageHistory, ConversationBufferMemory
@@ -23,6 +24,20 @@ prompt_template = PromptTemplate(
 	template_format="f-string",
 	validate_template=True,
 )
+def is_valid_select_query(query):
+    # Check if the query starts with SELECT
+    select_pattern = r'^\s*select\b'
+    if not re.match(select_pattern, query, re.IGNORECASE):
+        return False  # Not a SELECT query
+    
+    # Check for the presence of DELETE, UPDATE, or ALTER keywords
+    forbidden_keywords = ['delete', 'update', 'alter']
+    for keyword in forbidden_keywords:
+        pattern = rf'\b{keyword}\b'
+        if re.search(pattern, query, re.IGNORECASE):
+            return False  # Contains forbidden keywords
+    
+    return True  # It's a valid SELECT query without forbidden keywords
 
 @frappe.whitelist()
 def get_chatbot_history(**kwargs):
@@ -84,7 +99,47 @@ def get_chatbot_history(**kwargs):
 		data = frappe.db.sql(sqlquery, as_dict=1)
 		# message_history.add_ai_message(sqlquery)
 		message_history.add_ai_message(str(frappe.as_json(data)))
+	else:
+		sqlquery = """SELECT 
+						name
+					FROM "tabDocType" m   
+					WHERE m.name IS NOT NULL
+					ORDER BY m.idx DESC; 
+						"""
+			
+		docdata = frappe.db.sql(sqlquery, as_dict=1)
 
+		queries=[]
+		for d in docdata:
+			doctypename = " AND parent = '%s'"%str(d["name"])
+			sqlquery = """SELECT 
+							fieldname,
+							label,
+							fieldtype
+						FROM "tabDocField" m   
+						WHERE m.name IS NOT NULL  %s AND fieldtype NOT IN ('Tab Break', 'Section Break', 'Heading', 'Column Break', 'Table', 'HTML', 'Table MultiSelect')
+						ORDER BY m.idx DESC; 
+							"""%(doctypename)
+				
+			data = frappe.db.sql(sqlquery, as_dict=1)
+
+			fields = []
+			for dc in data:
+				# fields.append(f'{d.fieldname}  as "{d.label}" -- "{frappe.db.type_map.get(d.fieldtype)[0]}"')
+				fields.append(f'{dc.fieldname}  as "{dc.label}"')
+
+			field = ",".join(str(x) for x in fields)
+			doctype_name = "%s"%str(d["name"])
+			queries.append(f"""SELECT 
+							%s
+						FROM "tab%s" m   
+						WHERE m.name IS NOT NULL 
+						ORDER BY m.idx DESC; 
+							"""%(field,doctype_name))
+			queries.append(f""" -- table name "tab%s"  table name  case-sensitive table name enclosed in double qoutes;"""%(str(d["name"]))) 				 
+
+		sqlqueries = " ".join(str(x) for x in queries)
+		message_history.add_ai_message(sqlqueries)
 	return historydata
 
 
@@ -117,20 +172,28 @@ def get_chatbot_response(**kwargs) -> str:
 	conversation_chain = ConversationChain(llm=llm, memory=memory, prompt=prompt_template)
 
 	response = conversation_chain.run(prompt_message)
-
-	if response.count("```") >= 2:  # Ensure there are at least 2 occurrences to replace
-		parts = response.split("```", 2)  # Split at the first two sets of triple apostrophes
-		response = f"<div style='padding:10px; margin:10px; border:1px solid black; background-color:#f0f0f0;'>{parts[1]}</div>"
+	pattern= r'```sql\s([\s\S]*?)\s```'
+	airespons = re.findall(pattern, response)
+	if airespons:
+		if is_valid_select_query(airespons[0]):
+			airesponse = f"<div style='padding:10px; margin:10px; border:1px solid black; background-color:#f0f0f0;'>{airespons[0]}</div>"
+		else:
+			airesponse = "SQL contains forbidden keywords or is not a valid SELECT query."	
 	else:
-		# If no triple apostrophes, return the original response
-		response = response
+		airesponse = response
+	# if response.count("```") >= 2:  # Ensure there are at least 2 occurrences to replace
+	# 	parts = response.split("```", 2)  # Split at the first two sets of triple apostrophes
+	# 	response = f"<div style='padding:10px; margin:10px; border:1px solid black; background-color:#f0f0f0;'>{parts[1]}</div>"
+	# else:
+	# 	# If no triple apostrophes, return the original response
+	# 	response = response
 
 	if kwargs.get("prompt_message"):
 		prompt_message = "%s"%(str(kwargs["prompt_message"]))	
 	my_route_card = frappe.new_doc("Chat History")
 	my_route_card.added_date = datetime.datetime.now()
 	my_route_card.human = prompt_message
-	my_route_card.ai = response 
+	my_route_card.ai = airesponse 
 	my_route_card.user_name = session_id 
 	doctype_name = ''
 	if kwargs.get("doctype"):
@@ -139,7 +202,7 @@ def get_chatbot_response(**kwargs) -> str:
 	my_route_card.doctype_name = doctype_name 
 	my_route_card.save(ignore_permissions=1)
 
-	return  response 
+	return  airesponse 
 
 
 def get_model_from_settings():
