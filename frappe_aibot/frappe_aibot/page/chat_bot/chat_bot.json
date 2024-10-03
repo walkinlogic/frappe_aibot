@@ -1,0 +1,19 @@
+{
+ "content": null,
+ "creation": "2024-08-23 18:19:33.279392",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2024-08-23 18:19:33.279392",
+ "modified_by": "Administrator",
+ "module": "Frappe Aibot",
+ "name": "chat-bot",
+ "owner": "Administrator",
+ "page_name": "chat-bot",
+ "roles": [],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "AI Chat Bot"
+}

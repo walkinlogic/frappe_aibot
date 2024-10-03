@@ -1,0 +1,49 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-09-19 15:46:04.985790",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "openai_model",
+  "openai_api_key"
+ ],
+ "fields": [
+  {
+   "fieldname": "openai_model",
+   "fieldtype": "Select",
+   "label": "OpenAI Model",
+   "options": "gpt-3.5-turbo\ngpt-3.5-turbo-16k\nGPT-4o mini\no1-preview and o1-mini\ngpt-4o\ngpt-4\ngpt-4-32k\nchatgpt-4o-latest\ngpt-4o-mini"
+  },
+  {
+   "fieldname": "openai_api_key",
+   "fieldtype": "Data",
+   "label": "OpenAI API Key"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2024-09-26 15:02:01.516801",
+ "modified_by": "Administrator",
+ "module": "Frappe Aibot",
+ "name": "AIBot Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
